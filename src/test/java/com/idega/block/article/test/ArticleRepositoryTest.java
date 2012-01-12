@@ -25,12 +25,8 @@ import com.idega.repository.RepositoryService;
 @ContextConfiguration
 public class ArticleRepositoryTest extends IdegaBaseTest{
 	
-<<<<<<< HEAD
-	private IdegaRepository repository;
-=======
 	@Autowired
 	private RepositoryService repository;
->>>>>>> BRANCH_PLATFORM_5
 	
 	private Session session;
 	private Credentials credentials = new SimpleCredentials("root","".toCharArray());
