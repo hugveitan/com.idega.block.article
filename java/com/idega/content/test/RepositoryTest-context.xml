@@ -18,6 +18,7 @@
         	<property name="domainConfig" ref="slideTestDomainConfig"></property>
         </bean>
         -->
+
         <bean id="slideTestDomainConfig" class="com.idega.slide.webdavservlet.DomainTestConfig"/>
-        <bean class="com.idega.content.repository.IdegaRepositoryBean" />
+        <bean class="com.idega.jackrabbit.repository.impl.JackrabbitRepository" />
 </beans>

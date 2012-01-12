@@ -1,7 +1,6 @@
 package com.idega.block.article.data.dao.impl;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.logging.Level;
@@ -43,26 +42,37 @@ public class ArticleDaoImpl extends GenericDaoImpl implements ArticleDao {
 
 	private static Logger LOGGER = Logger.getLogger(ArticleDaoImpl.class.getName());
 
+	/**
+	 * @see com.idega.block.article.data.dao.ArticleDao#updateArticle(Date, String, List)
+	 */
 	@Override
 	@Transactional(readOnly=false)
-	public boolean updateArticle(Date timestamp, String uri, Collection<String> categories) {
+	public boolean updateArticle(Date timestamp, String uri, List<String> categories) {
+		if (timestamp == null || StringUtil.isEmpty(uri)) {
+			LOGGER.warning("Can not update article because URI (" + uri + ") or modification date (" + timestamp + ") are not provided!");
+			return false;
+		}
+		
 		boolean result = true;
 
-		if(!ListUtil.isEmpty(categories)){
-			this.categoryDao.addCategories(categories);
+		if (!ListUtil.isEmpty(categories)) {
+		    this.categoryDao.addCategories(categories);
 		}
 
 		ArticleEntity articleEntity = this.getArticle(uri);
-		if(articleEntity == null){
+		if (articleEntity == null) {
+			List<CategoryEntity> categoriesForTheArticle = this.categoryDao.getCategories(categories);
+			
 			articleEntity = new ArticleEntity();
 			articleEntity.setUri(uri);
 			articleEntity.setModificationDate(timestamp);
-			articleEntity.setCategories(this.categoryDao.getCategories(categories));
+			if (!ListUtil.isEmpty(categoriesForTheArticle))
+				articleEntity.setCategories(categoriesForTheArticle);
 
 			try {
 				persist(articleEntity);
 			} catch (Exception e) {
-				LOGGER.log(Level.WARNING, "Failed to add article to database: " + articleEntity, e);
+				LOGGER.log(Level.WARNING, "Failed to add article to database: " + articleEntity + " with the categories: " + categoriesForTheArticle, e);
 				return false;
 			}
 
@@ -70,9 +80,9 @@ public class ArticleDaoImpl extends GenericDaoImpl implements ArticleDao {
 			List<CategoryEntity> categoryEntitiesInArticle = articleEntity.getCategories();
 			List<CategoryEntity> categoryEntitiesToRemove = new ArrayList<CategoryEntity>(0);
 			/*Deleting all used categories from temporary lists*/
-			if((!ListUtil.isEmpty(categoryEntitiesInArticle))&&(!ListUtil.isEmpty(categories))){
-				for(CategoryEntity o : categoryEntitiesInArticle){
-					if(categories.contains(o.getCategory())){
+			if (!ListUtil.isEmpty(categoryEntitiesInArticle) && !ListUtil.isEmpty(categories)) {
+				for (CategoryEntity o : categoryEntitiesInArticle) {
+					if (categories.contains(o.getCategory())) {
 						categories.remove(o.getCategory());
 					} else {
 						categoryEntitiesToRemove.add(o);
@@ -83,9 +93,9 @@ public class ArticleDaoImpl extends GenericDaoImpl implements ArticleDao {
 				result = articleEntity.removeCategories(categoryEntitiesToRemove);
 				/*Performing addition of new a categories*/
 				result = articleEntity.addCategories(this.categoryDao.getCategories(categories));
-			} else if((!ListUtil.isEmpty(categoryEntitiesInArticle))&&(ListUtil.isEmpty(categories))){
+			} else if (!ListUtil.isEmpty(categoryEntitiesInArticle) && ListUtil.isEmpty(categories)) {
 				result = articleEntity.removeCategories(categoryEntitiesInArticle);
-			} else if((ListUtil.isEmpty(categoryEntitiesInArticle))&&(!ListUtil.isEmpty(categories))){
+			} else if (ListUtil.isEmpty(categoryEntitiesInArticle) && !ListUtil.isEmpty(categories)) {
 				result = articleEntity.addCategories(this.categoryDao.getCategories(categories));
 			}
 
@@ -97,54 +107,50 @@ public class ArticleDaoImpl extends GenericDaoImpl implements ArticleDao {
 			}
 		}
 
-		if(result){
+		if (result)
 			return articleEntity != null && articleEntity.getId() != null;
-		}
 
 		return result;
 	}
 
+	/**
+     * @see com.idega.block.article.data.dao.ArticleDao#getArticle(String)
+     */
 	@Override
 	public ArticleEntity getArticle(String uri){
-		if(StringUtil.isEmpty(uri)){
+		if (StringUtil.isEmpty(uri)) {
+			LOGGER.warning("Aricle URI is not provided");
 			return null;
 		}
 
-		if (uri.contains(CoreConstants.WEBDAV_SERVLET_URI)) {
+		if (uri.startsWith(CoreConstants.WEBDAV_SERVLET_URI))
 			uri = uri.substring(CoreConstants.WEBDAV_SERVLET_URI.length());
-		}
-
-		if (uri.endsWith(CoreConstants.SLASH)) {
+		if (uri.endsWith(CoreConstants.SLASH))
 			uri = uri.substring(0, uri.lastIndexOf(CoreConstants.SLASH));
-		}
 
 		return this.getSingleResult(ArticleEntity.GET_BY_URI, ArticleEntity.class, new Param(ArticleEntity.uriProp, uri));
 	}
 
+	/**
+     * @see com.idega.block.article.data.dao.ArticleDao#getArticleIdByURI(String)
+     */
 	@Override
 	public Long getArticleIdByURI(String uri){
-		if (StringUtil.isEmpty(uri)) {
-			return new Long(-1);
-		}
-
-		if (uri.contains(CoreConstants.WEBDAV_SERVLET_URI)) {
-			uri = uri.substring(CoreConstants.WEBDAV_SERVLET_URI.length());
-		}
-
-		if (uri.endsWith(CoreConstants.SLASH)) {
-			uri = uri.substring(0, uri.lastIndexOf(CoreConstants.SLASH));
-		}
-
-		return this.getSingleResult(ArticleEntity.GET_ID_BY_URI, Long.class, new Param(ArticleEntity.uriProp, uri));
+		ArticleEntity article = getArticle(uri);
+		return article == null ? Long.valueOf(-1) : article.getId();
 	}
 
+	/**
+     * @see com.idega.block.article.data.dao.ArticleDao#deleteArticle(String)
+     */
 	@Override
 	@Transactional(readOnly=false)
 	public boolean deleteArticle(String uri) {
 		final ArticleEntity article = getArticle(uri);
 		if (article == null)
 			return false;
-		try{
+		
+		try {
 			this.remove(article);
 			return true;
 		} catch (Exception e) {
@@ -154,9 +160,12 @@ public class ArticleDaoImpl extends GenericDaoImpl implements ArticleDao {
 		return false;
 	}
 
+	/**
+     * @see com.idega.block.article.data.dao.ArticleDao#getArticlesByCategoriesAndAmount(List, String, int)
+     */
 	@Override
-	public List <String> getUrisByCategoriesAndAmount(List<String> categories, String uriFrom, int maxResults) {
-		StringBuilder inlineQuery = new StringBuilder("SELECT DISTINCT a.").append(ArticleEntity.uriProp).append(" FROM ArticleEntity a");
+	public List <ArticleEntity> getArticlesByCategoriesAndAmount(List<String> categories, String uriFrom, int maxResults) {
+		StringBuilder inlineQuery = new StringBuilder("SELECT DISTINCT a").append(" FROM ArticleEntity a");
 		if(!ListUtil.isEmpty(categories)){
 			inlineQuery.append(" JOIN a.").append(ArticleEntity.categoriesProp).append(" c WHERE " +
 					"c.").append(CategoryEntity.categoryProp).append(" IN (:").append(ArticleEntity.categoriesProp).append(")");
@@ -175,35 +184,22 @@ public class ArticleDaoImpl extends GenericDaoImpl implements ArticleDao {
 			query.setMaxResults(maxResults);
 		}
 
-		List <String> uris = null;
+		List <ArticleEntity> entities = null;
 		if(!ListUtil.isEmpty(categories)){
 			if(StringUtil.isEmpty(uriFrom)){
-				uris = query.getResultList(String.class, new Param(ArticleEntity.categoriesProp,categories));
+				entities = query.getResultList(ArticleEntity.class, new Param(ArticleEntity.categoriesProp,categories));
 			}else{
-				uris = query.getResultList(String.class, new Param(ArticleEntity.categoriesProp,categories),
+				entities = query.getResultList(ArticleEntity.class, new Param(ArticleEntity.categoriesProp,categories),
 						new Param(ArticleEntity.uriProp, uriFrom));
 			}
 		}else{
 			if(StringUtil.isEmpty(uriFrom)){
-				uris = query.getResultList(String.class);
+				entities = query.getResultList(ArticleEntity.class);
 			}else{
-				uris = query.getResultList(String.class, new Param(ArticleEntity.uriProp, uriFrom));
+				entities = query.getResultList(ArticleEntity.class, new Param(ArticleEntity.uriProp, uriFrom));
 			}
 		}
 
-		return uris;
+		return entities;
 	}
-
-	/**
-	 * Tested cases:
-	 * Written article with name: "Name";
-	 * Written article with name: "SecondName" and category: "Name";
-	 * Added category "English good name" to article "SecondName";
-	 * Removed category "Name" from article "SecondName";
-	 * Removed category "English good name" from article "SecondName";
-	 * Removed "SecondName";
-	 * Added category "Name" to article "Name";
-	 * Removed category "Name" and added category "English good name" to article "Name";
-	 * Changed article name: "Name" to article name: "Surname".
-	 */
 }

@@ -18,14 +18,19 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import com.idega.block.article.bean.ArticleItemBean;
-import com.idega.core.content.IdegaRepository;
 import com.idega.core.test.base.IdegaBaseTest;
+import com.idega.repository.RepositoryService;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration
 public class ArticleRepositoryTest extends IdegaBaseTest{
 	
+<<<<<<< HEAD
 	private IdegaRepository repository;
+=======
+	@Autowired
+	private RepositoryService repository;
+>>>>>>> BRANCH_PLATFORM_5
 	
 	private Session session;
 	private Credentials credentials = new SimpleCredentials("root","".toCharArray());
@@ -110,4 +115,3 @@ public class ArticleRepositoryTest extends IdegaBaseTest{
 		TestRunner.run(new ArticleRepositoryTest());
 	}
 }
-

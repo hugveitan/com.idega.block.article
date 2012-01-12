@@ -1,19 +1,15 @@
 package com.idega.block.article.importer;
 
-import java.io.IOException;
-import java.rmi.RemoteException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.Locale;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.apache.commons.httpclient.HttpException;
-import org.apache.webdav.lib.PropertyName;
-import org.apache.webdav.lib.WebdavResource;
-import org.apache.webdav.lib.WebdavResources;
+import javax.jcr.PropertyType;
+import javax.jcr.RepositoryException;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.ApplicationEvent;
@@ -28,56 +24,65 @@ import com.idega.content.business.categories.CategoryBean;
 import com.idega.content.data.ContentCategory;
 import com.idega.core.business.DefaultSpringBean;
 import com.idega.core.localisation.business.ICLocaleBusiness;
-import com.idega.idegaweb.IWMainSlideStartedEvent;
+
+import com.idega.idegaweb.RepositoryStartedEvent;
 import com.idega.idegaweb.UnavailableIWContext;
-import com.idega.slide.business.IWSlideService;
+import com.idega.repository.bean.RepositoryItem;
+import com.idega.repository.jcr.JCRItem;
 import com.idega.util.CoreConstants;
 import com.idega.util.ListUtil;
-
+import com.idega.util.StringUtil;
 
 /**
  * Imports articles and their categories to database.
  * @author martynas
  * Last changed: 2011.05.18
  * You can report about problems to: <a href="mailto:martynas@idega.com">Martynas Stakė</a>
+<<<<<<< HEAD
  * AIM: lapiukshtiss
  * Skype: lapiukshtiss
+=======
+>>>>>>> BRANCH_PLATFORM_5
  * You can expect to find some test cases notice in the end of the file.
  */
 
 @Service
 @Scope(BeanDefinition.SCOPE_SINGLETON)
 public class ArticlesImporter extends DefaultSpringBean implements ApplicationListener {
-    @Autowired
+
+	@Autowired
     private CategoriesEngine categoryEngine;
 
     @Autowired
     private CategoryDao categoryDao;
-    
-    @Autowired 
+
+    @Autowired
     private ArticleDao articleDao;
-    
-    private static Logger LOGGER = Logger.getLogger(ArticlesImporter.class.getName());
 
     private static final String CATEGORIES_IMPORTED_APP_PROP = "is_categories_imported",
     							ARTICLES_IMPORTED_APP_PROP = "is_articles_imported";
-    
-    /* (non-Javadoc)
+
+    /**
      * @see org.springframework.context.ApplicationListener#onApplicationEvent(org.springframework.context.ApplicationEvent)
      */
     @Override
     public void onApplicationEvent(ApplicationEvent event) {
-        if (event instanceof IWMainSlideStartedEvent) {
+        if (event instanceof RepositoryStartedEvent) {
             Boolean isCategoriesImported = getApplication().getSettings().getBoolean(CATEGORIES_IMPORTED_APP_PROP, Boolean.FALSE);
+
             if (!isCategoriesImported) {
                 isCategoriesImported = importCategories();
-                getApplication().getSettings().setProperty(CATEGORIES_IMPORTED_APP_PROP, isCategoriesImported.toString());
+                getApplication().getSettings().setProperty(CATEGORIES_IMPORTED_APP_PROP,
+                        isCategoriesImported.toString());
             }
 
-            Boolean isArticlesImported = getApplication().getSettings().getBoolean(ARTICLES_IMPORTED_APP_PROP, Boolean.FALSE);
+            Boolean isArticlesImported = getApplication().getSettings()
+                    .getBoolean(ARTICLES_IMPORTED_APP_PROP, Boolean.FALSE);
+
             if (!isArticlesImported && isCategoriesImported) {
                 isArticlesImported = this.importArticles();
-                getApplication().getSettings().setProperty(ARTICLES_IMPORTED_APP_PROP, isArticlesImported.toString());
+                getApplication().getSettings().setProperty(ARTICLES_IMPORTED_APP_PROP,
+                        isArticlesImported.toString());
             }
         }
     }
@@ -91,24 +96,30 @@ public class ArticlesImporter extends DefaultSpringBean implements ApplicationLi
         if (localeList == null) {
             return Boolean.FALSE;
         }
-        
+
         if (this.categoryEngine == null) {
             return Boolean.FALSE;
         }
-        
+
         for(Locale locale : localeList){
             List<ContentCategory> categoryList = null;
             try {
                 categoryList = this.categoryEngine.getCategoriesByLocale(locale.toString());
             } catch (UnavailableIWContext e){
-                LOGGER.log(Level.WARNING, "Failed to import because categories.xml deos not exist", e);
+                getLogger().log(Level.WARNING,
+                        "Failed to import because categories.xml deos not exist",
+                        e);
                 return Boolean.FALSE;
             }
-            
-            if(ListUtil.isEmpty(categoryList)){
+
+            if (ListUtil.isEmpty(categoryList)) {
                 continue;
             }
+
             for(ContentCategory category : categoryList){
+                if (category == null || category.getId() == null)
+                    continue;
+
                 Boolean isAdded = categoryDao.addCategory(category.getId());
                 if(!isAdded){
                     return Boolean.FALSE;
@@ -123,241 +134,191 @@ public class ArticlesImporter extends DefaultSpringBean implements ApplicationLi
      * @return true, if imported, false if at least one article was not imported.
      */
     public boolean importArticles(){
-
-        IWSlideService iWSlideService = getServiceInstance(IWSlideService.class);
         try {
             /*Getting the articles folders*/
-            WebdavResource resource = iWSlideService.getWebdavResourceAuthenticatedAsRoot(CoreConstants.CONTENT_PATH+CoreConstants.ARTICLE_CONTENT_PATH);
-            boolean importResult = this.importArticleFolders(resource);
-            resource.close();
-            return importResult;
-        } catch (HttpException e) {
-            LOGGER.log(Level.WARNING, "Failed to import articles cause of:", e);
-        } catch (RemoteException e) {
-            LOGGER.log(Level.WARNING, "Failed to import articles cause of:", e);
-        } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "No such folder or you do not have a permission to access it: ", e);
+            RepositoryItem resource = getRepositoryService().getRepositoryItemAsRootUser(CoreConstants.CONTENT_PATH+CoreConstants.ARTICLE_CONTENT_PATH);
+            return this.importArticleFolders(resource);
+        } catch (RepositoryException e) {
+            getLogger().log(Level.WARNING, "Failed to import articles cause of:", e);
         }
         return Boolean.FALSE;
     }
-    
+
     /**
      * Browse recursively thought folders, searches for articles folders, imports articles if found some.
      * @param resource Path where to start looking for articles to import.
      * @return true, if articles found and imported, false if not all articles imported.
      */
-    public boolean importArticleFolders(WebdavResource resource) {
+    public boolean importArticleFolders(RepositoryItem resource) {
         if (resource == null) {
             return Boolean.FALSE;
         }
-        
+
         if (!resource.exists()) {
             return Boolean.FALSE;
         }
-        
+
         if (this.importArticles(resource)) {
             return Boolean.TRUE;
         } else {
             try {
-                WebdavResource[] foldersAndFilesResources = resource.listWebdavResources();
-                if (foldersAndFilesResources == null) {
+                Collection<RepositoryItem> foldersAndFilesResources = resource.getChildResources();
+                if (ListUtil.isEmpty(foldersAndFilesResources)) {
                     return Boolean.FALSE;
                 }
-                
+
                 boolean result = Boolean.FALSE;
-                for (WebdavResource wr : foldersAndFilesResources) {
-                    if (this.importArticleFolders(wr)) {
+                for (RepositoryItem wr : foldersAndFilesResources) {
+                    if (this.importArticleFolders(wr))
                         result = Boolean.TRUE;
-                        wr.close();
-                    } else {
-                        if (wr != null) {
-                            wr.close();
-                        }
-                    }
                 }
-                
+
                 /*Trying to solve out of memory exception*/
                 foldersAndFilesResources = null;
                 resource = null;
 
                 return result;
-            } catch (HttpException e) {
-                LOGGER.log(Level.WARNING, "Http:Exception: ",e);
-            } catch (IOException e) {
-                LOGGER.log(Level.WARNING, "No such folder or you do not have a permission to access it: ", e);
+            } catch (Exception e) {
+                getLogger().log(Level.WARNING, "Failed to import articles from: " + resource.getPath(), e);
             }
         }
-        
-        // TODO close resources on failure. Does possible to get failure here?
-        return Boolean.FALSE;        
+
+        return Boolean.FALSE;
     }
-    
+
     /**
      * Checks, if it is folder containing article folders.
      * @param resource Folder, that might be containing article folders.
      * @return true, if it is folder of articles, false, if not.
      */
-    public boolean isArticlesFolder(WebdavResource resource){
-        if (resource == null || !resource.exists()) {
+    public boolean isArticlesFolder(RepositoryItem resource){
+        if (resource == null || !resource.exists())
             return Boolean.FALSE;
-        }
-        
+
         /*Checking is it folder*/
-        if (!resource.isCollection()) {
+        if (!resource.isCollection())
             return Boolean.FALSE;
-        }
-        
+
         try {
-            WebdavResources webdavResources = resource.getChildResources();
-            if (webdavResources == null) {
+            Collection<RepositoryItem> webdavResources = resource.getChildResources();
+            if (ListUtil.isEmpty(webdavResources))
                 return Boolean.FALSE;
-            }
-            
-            String[] arrayOfResourcesInStringRepresentation = webdavResources.list();
-            if (arrayOfResourcesInStringRepresentation == null) {
-                return Boolean.FALSE;
-            }
-            
-            for (String s : arrayOfResourcesInStringRepresentation) {
-                if (s.endsWith(CoreConstants.ARTICLE_FILENAME_SCOPE)) {
+
+            for (RepositoryItem child: webdavResources) {
+                if (child.getPath().endsWith(CoreConstants.ARTICLE_FILENAME_SCOPE)) {
                     return Boolean.TRUE;
                 }
             }
-            
+
             /*Trying to solve out of memory exception*/
-            arrayOfResourcesInStringRepresentation = null;
             resource = null;
             webdavResources = null;
-            
-        } catch (HttpException e) {
-            LOGGER.log(Level.WARNING, "Http:Exception: ",e);
-        } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "No such folder or you do not have a permission to access it: ", e);
+        } catch (Exception e) {
+            getLogger().log(Level.WARNING, "Failed to detect if provided resource (" + resource.getPath() + ") is a folder", e);
         }
-        
+
         return Boolean.FALSE;
     }
-    
+
     /**
      * Imports articles to database table "IC_ARTICLE" or updates it if exist.
      * @param resource Folder of articles folder.
      * @return true, if imported, false if failed or not articles folder.
      */
-    public boolean importArticles(WebdavResource resource){
-        if (!this.isArticlesFolder(resource)) {
+    public boolean importArticles(RepositoryItem resource){
+        if (!this.isArticlesFolder(resource))
             return Boolean.FALSE;
-        }
-        
+
         try {
-            WebdavResources filesAndFolders = resource.getChildResources();
-            if (filesAndFolders == null) {
+            Collection<RepositoryItem> filesAndFolders = resource.getChildResources();
+            if (ListUtil.isEmpty(filesAndFolders))
                 return Boolean.FALSE;
-            }
-            
-            WebdavResource[] arrayOfResources = filesAndFolders.listResources();
-            if (arrayOfResources == null) {
-                return Boolean.FALSE;
-            }
-            
-            int size = arrayOfResources.length;
+
+            int size = filesAndFolders.size();
             boolean isImportSuccesful = Boolean.TRUE;
-            String propertyName = new PropertyName("DAV", "categories").toString();
-            for (WebdavResource r : arrayOfResources) {
-                if (r.getName().endsWith(CoreConstants.ARTICLE_FILENAME_SCOPE)) {
-                    String uri = r.getPath();
-                        
+            String propertyPrefix = "DAV";
+            String propertyName = "categories";
+            for (RepositoryItem item: filesAndFolders) {
+                if (item instanceof JCRItem && item.getName().endsWith(CoreConstants.ARTICLE_FILENAME_SCOPE)) {
+                    String uri = item.getPath();
+
                     if (uri.contains(CoreConstants.WEBDAV_SERVLET_URI)) {
                         uri = uri.substring(CoreConstants.WEBDAV_SERVLET_URI.length());
                     }
-                        
+
                     if (uri.endsWith(CoreConstants.SLASH)) {
                         uri = uri.substring(0, uri.lastIndexOf(CoreConstants.SLASH));
                     }
-                    
-                    @SuppressWarnings("unchecked")
-                    Enumeration<String> resourceEnumeration = r.propfindMethod(r.getPath(), propertyName);
-                    Collection<String> enumerationList = null;
-                    
-                    if (resourceEnumeration != null){
-                        while (resourceEnumeration.hasMoreElements()) {
-                            enumerationList = CategoryBean.getCategoriesFromString(resourceEnumeration.nextElement());
-                        }
+
+                    JCRItem jcrItem = (JCRItem) item;
+                    Collection<String> categories = null;
+                    String categoriesProperty = jcrItem.getPropertyValue(propertyPrefix, propertyName, PropertyType.STRING);
+                    if (!StringUtil.isEmpty(categoriesProperty)) {
+                    	categories = CategoryBean.getCategoriesFromString(categoriesProperty);
                     }
-                    
-                    if(!this.articleDao.updateArticle(new Date(r.getCreationDate()), uri, enumerationList)){
+
+                    if (!this.articleDao.updateArticle(new Date(item.getCreationDate()), uri, ListUtil.isEmpty(categories) ? null : new ArrayList<String>(categories))) {
                         isImportSuccesful = Boolean.FALSE;
                         break;
                     }
                     size = size-1;
-                    r.close();
                 }
             }
-            
+
             /*Trying to solve out of memory exception*/
-            if (!isImportSuccesful) {
-                for (WebdavResource r : arrayOfResources){
-                    if (r != null){
-                        r.close();
-                    }
-                }
-            }
-            
-            arrayOfResources = null;
             filesAndFolders = null;
             resource = null;
             return isImportSuccesful;
-        } catch (HttpException e) {
-            LOGGER.log(Level.WARNING, "Failed to import articles cause of:", e);
-        } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "No such folder or you do not have a permission to access it: ", e);
+        } catch (Exception e) {
+            getLogger().log(Level.WARNING, "Failed to import an article: " + resource.getPath(), e);
         }
-        
+
         return Boolean.FALSE;
     }
-    
+
     /*
      * Test cases isArticlesFolder(WebdavResource resource):
      * Passed articles folder, returned: true
      * Passed not articles folder, returned: false
      * Passed null, returned: false
-     * 
+     *
      * Test cases importArticles(WebdavResource resource):
-     * Passed articles folder, without categories, 
+     * Passed articles folder, without categories,
      * returned: true;
      * imported: true;
-     * 
+     *
      * Test cases importArticles(WebdavResource resource):
-     * Passed articles folder, with category, 
+     * Passed articles folder, with category,
      * returned: true;
      * imported: true;
-     * 
+     *
      * Test cases importArticles(WebdavResource resource):
-     * Passed articles folder, with categories, 
+     * Passed articles folder, with categories,
      * returned: true;
      * imported: true;
-     * 
+     *
      * Test cases importArticles(WebdavResource resource):
-     * Passed same as before articles folder, with categories, 
+     * Passed same as before articles folder, with categories,
      * returned: true;
      * imported: false, changed nothing, but executed;
-     * 
-     * Passed not articles folder, 
+     *
+     * Passed not articles folder,
      * returned: false;
      * imported: false;
-     * 
+     *
      * Passed null,
      * returned: false
      * imported: false
-     * 
+     *
      * Test cases importArticles():
      * Passed directory /files/cms/article/ with 669 articles in different folders, ~3 articles in one folder
      * returned: true
      * imported: true
-     * 
+     *
      * Passed directory /files/cms/article/ with 999 articles in different folders, ~3 articles in one folder. Also different categories or no categories
      * returned: true
      * imported: true
-     * 
+     *
      * Test cases importCategories():
      * Passed empty directory,
      * imported: false;

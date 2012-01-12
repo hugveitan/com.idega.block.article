@@ -25,30 +25,23 @@ import javax.faces.event.ValueChangeListener;
 import javax.jcr.Node;
 import javax.jcr.NodeIterator;
 import javax.jcr.RepositoryException;
-import javax.jcr.Session;
-import org.apache.commons.httpclient.HttpException;
-import org.apache.webdav.lib.PropertyName;
-import org.apache.webdav.lib.WebdavResources;
 
 import com.idega.block.article.ArticleCacher;
 import com.idega.block.article.business.ArticleConstants;
 import com.idega.block.article.business.ArticleUtil;
+import com.idega.builder.bean.AdvancedProperty;
 import com.idega.content.bean.ContentItem;
 import com.idega.content.bean.ContentItemBean;
 import com.idega.content.bean.ContentItemCase;
+import com.idega.content.bean.ContentItemField;
 import com.idega.content.business.ContentConstants;
 import com.idega.content.business.ContentUtil;
 import com.idega.core.builder.business.BuilderService;
 import com.idega.core.builder.business.BuilderServiceFactory;
-import com.idega.core.content.RepositoryHelper;
 import com.idega.data.IDOStoreException;
 import com.idega.idegaweb.IWMainApplication;
-import com.idega.idegaweb.IWUserContext;
 import com.idega.idegaweb.UnavailableIWContext;
 import com.idega.presentation.IWContext;
-import com.idega.slide.business.IWSlideSession;
-import com.idega.slide.util.WebdavExtendedResource;
-import com.idega.slide.util.WebdavRootResource;
 import com.idega.util.CoreConstants;
 import com.idega.util.CoreUtil;
 import com.idega.util.StringHandler;
@@ -57,8 +50,8 @@ import com.idega.xml.XMLException;
 
 /**
  * <p>
- * This is a JSF managed bean that manages each article instance and delegates 
- * all calls to the correct localized instance. You can find article edition forms at http://localhost:8080/workspace/content/article/
+ * This is a JSF managed bean that manages each article instance and delegates
+ * all calls to the correct localized instance. You can find all the articles at http://localhost:8080/workspace/content/article/
  * <p>
  * Last modified: $Date: 2009/01/10 12:24:10 $ by $Author: valdas $
  *
@@ -66,28 +59,25 @@ import com.idega.xml.XMLException;
  * @version $Revision: 1.88 $
  */
 public class ArticleItemBean extends ContentItemBean implements Serializable, ContentItem, ValueChangeListener {
-	
-	/**
-	 * Comment for <code>serialVersionUID</code>
-	 */
+
 	private static final long serialVersionUID = 4514851565086272678L;
 	private final static String ARTICLE_FILE_SUFFIX = ".xml";
-	
+
 	public final static String TYPE_PREFIX = "IW:";
 	public final static String CONTENT_TYPE = "ContentType";
 	public final static String CONTENT_TYPE_WITH_PREFIX = TYPE_PREFIX+CONTENT_TYPE;
-	
-	public static final PropertyName PROPERTY_CONTENT_TYPE = new PropertyName(TYPE_PREFIX,CONTENT_TYPE);
-	
+
+//	public static final PropertyName PROPERTY_CONTENT_TYPE = new PropertyName(TYPE_PREFIX,CONTENT_TYPE);
+
 	private ArticleLocalizedItemBean localizedArticle;
 	private String baseFolderLocation;
 	private String languageChange;
 	private boolean allowFallbackToSystemLanguage=false;
 	private String resourcePath;
 	private boolean availableInRequestedLanguage=false;
-	
+
 	private boolean isPartOfArticleList = false;
-	
+
 	public boolean isPartOfArticleList() {
 		return isPartOfArticleList;
 	}
@@ -99,46 +89,37 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 	public ArticleLocalizedItemBean getLocalizedArticle(){
 		if (this.localizedArticle == null || getLanguageChange() != null) {
 			this.localizedArticle = new ArticleLocalizedItemBean(getLocale());
-			//this.localizedArticle.setLocale(getLocale());
 			this.localizedArticle.setArticleItem(this);
-			try {
+			/*try {
 				if(isPersistToJCR() && this.getSession()!=null){
 					this.localizedArticle.setSession(this.getSession());
 				}
 			} catch (RepositoryException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
-			}
+			}*/
 		}
-		else {	
+		else {
 			String thisLanguage = getLanguage();
 			String fileLanguage = this.localizedArticle.getLanguage();
 			if (!thisLanguage.equals(fileLanguage)) {
-				throw new RuntimeException("Locale ("+getLocale()+") inconsistency for article: "+getResourcePath()+" and localizedArticle: "+this.localizedArticle.getResourcePath());
+				throw new RuntimeException("Locale ("+getLocale()+") inconsistency for article: "+getResourcePath()+" and localizedArticle: " +
+						this.localizedArticle.getResourcePath());
 			}
 		}
 		return this.localizedArticle;
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#addImage(byte[], java.lang.String)
-	 */
 	public void addImage(byte[] imageData, String contentType) {
 		getLocalizedArticle().addImage(imageData, contentType);
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#clear()
-	 */
 	@Override
 	public void clear() {
 		getLocalizedArticle().clear();
 		this.resourcePath=null;
 		this.availableInRequestedLanguage=false;
 	}
-	/* (non-Javadoc)
-	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#getAsXML()
-	 */
+
 	public String getAsXML() throws IOException, XMLException {
 		return getLocalizedArticle().getAsXML();
 	}
@@ -172,14 +153,11 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 	public String getComment() {
 		return getLocalizedArticle().getComment();
 	}
-	
+
 	public String getLinkToComments() {
 		return getLocalizedArticle().getLinkToComments();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#getContentFieldNames()
-	 */
 	@Override
 	public String[] getContentFieldNames() {
 		return getLocalizedArticle().getContentFieldNames();
@@ -188,13 +166,11 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 	/* (non-Javadoc)
 	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#getContentItemPrefix()
 	 */
+	@Override
 	public String getContentItemPrefix() {
 		return getLocalizedArticle().getContentItemPrefix();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#getContentLanguage()
-	 */
 	public String getContentLanguage() {
 		return getLocalizedArticle().getContentLanguage();
 	}
@@ -210,23 +186,14 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 		return getLocalizedArticle().getHeadline();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#getImages()
-	 */
-	public List getImages() {
+	public List<ContentItemField> getImages() {
 		return getLocalizedArticle().getImages();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#getSource()
-	 */
 	public String getSource() {
 		return getLocalizedArticle().getSource();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#getTeaser()
-	 */
 	public String getTeaser() {
 		if (isDummyContentItem()) {
 			return ArticleConstants.EMPTY;
@@ -234,31 +201,19 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 		return getLocalizedArticle().getTeaser();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#getToolbarActions()
-	 */
 	@Override
 	public String[] getToolbarActions() {
 		return getLocalizedArticle().getToolbarActions();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#isUpdated()
-	 */
 	public boolean isUpdated() {
 		return getLocalizedArticle().isUpdated();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#prettifyBody()
-	 */
 	protected void prettifyBody() {
 		getLocalizedArticle().prettifyBody();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#removeImage(java.lang.Integer)
-	 */
 	public void removeImage(Integer imageNumber) {
 		getLocalizedArticle().removeImage(imageNumber);
 	}
@@ -280,7 +235,7 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 		getLocalizedArticle().setBody(body);
 	}
 
-	/** 
+	/**
 	 * Add or change an article comments here.
 	 * @param s Text, that should be saved.
 	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#setComment(java.lang.String)
@@ -288,13 +243,13 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 	public void setComment(String s) {
 		getLocalizedArticle().setComment(s);
 	}
-	
+
 	public void setLinkToComments(String linkToComments) {
 		getLocalizedArticle().setLinkToComments(linkToComments);
 	}
 
 	/**
-	 * Add or change an article header here, which shown in article creation dialog. 
+	 * Add or change an article header here, which shown in article creation dialog.
 	 * @param o Some object. Article header will be set as o.toString() value.
 	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#setHeadline(java.lang.Object)
 	 */
@@ -311,23 +266,14 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 		getLocalizedArticle().setHeadline(s);
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#setImages(java.util.List)
-	 */
-	public void setImages(List l) {
+	public void setImages(List<ContentItemField> l) {
 		getLocalizedArticle().setImages(l);
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#setPublished()
-	 */
 	protected void setPublished() {
 		getLocalizedArticle().setPublished();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#setSource(java.lang.String)
-	 */
 	public void setSource(String s) {
 		getLocalizedArticle().setSource(s);
 	}
@@ -341,16 +287,10 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 		getLocalizedArticle().setTeaser(s);
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#setUpdated(boolean)
-	 */
 	public void setUpdated(boolean b) {
 		getLocalizedArticle().setUpdated(b);
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#setUpdated(java.lang.Boolean)
-	 */
 	public void setUpdated(Boolean b) {
 		getLocalizedArticle().setUpdated(b);
 	}
@@ -360,92 +300,69 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 	 * @throws IDOStoreException
 	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#store()
 	 */
+	@Override
 	public void store() throws IDOStoreException {
 		try {
-			if(isPersistToWebDav()){
-				storeToWebDav();
-			}
-			else if(isPersistToJCR()){
-				storeToJCR();
-			}
+			storeToJCR();
 			getLocalizedArticle().store();
-			
+
 			IWMainApplication iwma = IWMainApplication.getDefaultIWMainApplication();
 			if(iwma!=null){
 				ArticleCacher cacher = ArticleCacher.getInstance(iwma);
 				cacher.getCacheMap().clear();
-				
+
 				ContentUtil.removeCategoriesViewersFromCache();
 			}
-		}
-		catch(ArticleStoreException ase){
+		} catch(ArticleStoreException ase){
 			throw ase;
-		}
-		catch(Exception e){
+		} catch(Exception e){
 			throw new RuntimeException(e);
 		}
-		if(isPersistToJCR()){
-			try {
-				commitJCRStore();
-			} catch (RepositoryException e) {
-				throw new IDOStoreException(e.getMessage());
-			}
+
+		try {
+			commitJCRStore();
+		} catch (RepositoryException e) {
+			throw new IDOStoreException(e.getMessage());
 		}
 	}
 
 	protected void commitJCRStore() throws RepositoryException{
-		getSession().save();
+		//getSession().save();
 	}
 
-	private void storeToWebDav() throws HttpException, IOException,
-			RemoteException {
-		IWUserContext iwuc = IWContext.getInstance();
-		IWSlideSession session = getIWSlideSession(iwuc);
-		WebdavRootResource rootResource = session.getWebdavRootResource();
+//	private void storeToWebDav() throws HttpException, IOException,	RemoteException {
+//		IWUserContext iwuc = IWContext.getInstance();
+//		IWSlideSession session = getIWSlideSession(iwuc);
+//		WebdavRootResource rootResource = session.getWebdavRootResource();
+//
+//		//	Setting the path for creating new file/creating localized version/updating existing file
+//		String articleFolderPath = getResourcePath();
+//
+//		boolean hadToCreate = session.createAllFoldersInPath(articleFolderPath);
+//		if (hadToCreate) {
+//			String fixedFolderURL = session.getURI(articleFolderPath);
+//			rootResource.proppatchMethod(fixedFolderURL, PROPERTY_CONTENT_TYPE, "LocalizedFile", true);
+//		}
+//		else{
+//			rootResource.proppatchMethod(articleFolderPath, PROPERTY_CONTENT_TYPE, "LocalizedFile", true);
+//		}
+//
+//		rootResource.close();
+//	}
 
+	private void storeToJCR() throws IOException, RepositoryException {
 		//	Setting the path for creating new file/creating localized version/updating existing file
-		String articleFolderPath = getResourcePath();
+		String articleFolderPath = getResourcePath();//"/content/files/public/article.lalala";//getResourcePath();
 
-		boolean hadToCreate = session.createAllFoldersInPath(articleFolderPath);
-		if (hadToCreate) {
-			String fixedFolderURL = session.getURI(articleFolderPath);
-			rootResource.proppatchMethod(fixedFolderURL, PROPERTY_CONTENT_TYPE, "LocalizedFile", true);
-		}
-		else{
-			rootResource.proppatchMethod(articleFolderPath, PROPERTY_CONTENT_TYPE, "LocalizedFile", true);
-		}
-		
-		rootResource.close();
+//		helper.createAllFoldersInPath(session,articleFolderPath);
+//		Node node = getNode();
+//		node.setProperty(CONTENT_TYPE_WITH_PREFIX, "LocalizedFile");
+//		node.save();
+
+		Node articleFolder = getRepositoryService().getNode(articleFolderPath);
+		getRepositoryService().setProperties(articleFolder, new AdvancedProperty(CONTENT_TYPE_WITH_PREFIX, "LocalizedFile"));
 	}
-	
-	private void storeToJCR() throws IOException, RepositoryException{
-		//IWUserContext iwuc = IWContext.getInstance();
-		//IWSlideSession session = getIWSlideSession(iwuc);
-		Session session = getSession();
-		//WebdavRootResource rootResource = session.getWebdavRootResource();
-		
-		//	Setting the path for creating new file/creating localized version/updating existing file
-		String articleFolderPath = getResourcePath();
-		
-		RepositoryHelper helper = getRepositoryHelper();
-		
-		helper.createAllFoldersInPath(session,articleFolderPath);
-		/*if (hadToCreate) {
-			//String fixedFolderURL = session.getURI(articleFolderPath);
-			String fixedFolderURL=articleFolderPath;
-			Node node = getNode()
-			rootResource.proppatchMethod(fixedFolderURL, PROPERTY_CONTENT_TYPE, "LocalizedFile", true);
-		}
-		else{
-			rootResource.proppatchMethod(articleFolderPath, PROPERTY_CONTENT_TYPE, "LocalizedFile", true);
-		}*/
-		Node node = getNode();
-		node.setProperty(CONTENT_TYPE_WITH_PREFIX, "LocalizedFile");
-		node.save();
-		//rootResource.close();
-		
-	}
-	
+
 	/* (non-Javadoc)
 	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#tryPublish()
 	 */
@@ -462,25 +379,16 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 		return getLocalizedArticle().getName();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#getDescription()
-	 */
 	@Override
 	public String getDescription() {
 		return getLocalizedArticle().getDescription();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#getItemType()
-	 */
 	@Override
 	public String getItemType() {
 		return getLocalizedArticle().getItemType();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#getCreatedByUserId()
-	 */
 	@Override
 	public int getCreatedByUserId() {
 		return getLocalizedArticle().getCreatedByUserId();
@@ -496,211 +404,137 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 		getLocalizedArticle().setName(s);
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#setDescription(java.lang.String)
-	 */
 	@Override
 	public void setDescription(String s) {
 		getLocalizedArticle().setDescription(s);
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#setItemType(java.lang.String)
-	 */
 	@Override
 	public void setItemType(String s) {
 		getLocalizedArticle().setItemType(s);
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#setCreatedByUserId(int)
-	 */
 	@Override
 	public void setCreatedByUserId(int id) {
 		getLocalizedArticle().setCreatedByUserId(id);
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#getLocales()
-	 */
 	@Override
-	public Map getLocales() {
+	public Map<String, Locale> getLocales() {
 		return getLocalizedArticle().getLocales();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#getPendingLocaleId()
-	 */
 	@Override
 	public String getPendingLocaleId() {
 		return getLocalizedArticle().getPendingLocaleId();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#setPendingLocaleId(java.lang.String)
-	 */
 	@Override
 	public void setPendingLocaleId(String localeId) {
 		getLocalizedArticle().setPendingLocaleId(localeId);
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#getRequestedStatus()
-	 */
 	@Override
 	public String getRequestedStatus() {
 		return getLocalizedArticle().getRequestedStatus();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#setRequestedStatus(java.lang.String)
-	 */
 	@Override
 	public void setRequestedStatus(String requestedStatus) {
 		getLocalizedArticle().setRequestedStatus(requestedStatus);
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#getAttachments()
-	 */
 	@Override
-	public List getAttachments() {
+	public List<ContentItemField> getAttachments() {
 		return getLocalizedArticle().getAttachments();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#setAttachment(java.util.List)
-	 */
+	public List<String> getAttachmentsUris() {
+		return getLocalizedArticle().getConvertedAttachments();
+	}
+
 	@Override
-	public void setAttachment(List l) {
+	public void setAttachment(List<ContentItemField> l) {
 		getLocalizedArticle().setAttachment(l);
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#getCase()
-	 */
 	@Override
 	public ContentItemCase getCase() {
 		return getLocalizedArticle().getCase();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#setCase(com.idega.content.bean.ContentItemCase)
-	 */
 	@Override
 	public void setCase(ContentItemCase caseBean) {
 		getLocalizedArticle().setCase(caseBean);
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#getStatus()
-	 */
 	@Override
 	public String getStatus() {
 		return getLocalizedArticle().getStatus();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#setStatus(java.lang.String)
-	 */
 	@Override
 	public void setStatus(String status) {
 		getLocalizedArticle().setStatus(status);
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#updateLocale()
-	 */
 	@Override
 	public void updateLocale() {
 		getLocalizedArticle().updateLocale();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#getCreationDate()
-	 */
 	@Override
 	public Timestamp getCreationDate() {
 		return getLocalizedArticle().getCreationDate();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#getVersionName()
-	 */
 	@Override
 	public String getVersionName() {
 		return getLocalizedArticle().getVersionName();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#setVersionName(java.lang.String)
-	 */
 	@Override
 	public void setVersionName(String name) {
 		getLocalizedArticle().setVersionName(name);
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#getRendered()
-	 */
 	@Override
 	public Boolean getRendered() {
 		return getLocalizedArticle().getRendered();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#setRendered(boolean)
-	 */
 	@Override
 	public void setRendered(boolean render) {
 		getLocalizedArticle().setRendered(render);
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#setRendered(java.lang.Boolean)
-	 */
 	@Override
 	public void setRendered(Boolean render) {
 		getLocalizedArticle().setRendered(render);
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#isAutoCreateResource()
-	 */
 	@Override
 	public boolean isAutoCreateResource() {
-		
+
 		return getLocalizedArticle().isAutoCreateResource();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#setAutoCreateResource(boolean)
-	 */
 	@Override
 	public void setAutoCreateResource(boolean autoCreateResource) {
-		
+
 		getLocalizedArticle().setAutoCreateResource(autoCreateResource);
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#getExists()
-	 */
 	@Override
 	public boolean getExists() {
-		
 		return getLocalizedArticle().getExists();
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#setExists(boolean)
-	 */
 	@Override
 	public void setExists(boolean exists) {
-		
 		getLocalizedArticle().setExists(exists);
 	}
-	
-	
+
 	@Override
 	public Object getValue(String fieldName) {
 		return getLocalizedArticle().getValue(fieldName);
@@ -710,9 +544,9 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 	public void setValue(String fieldName, Object value) {
 		getLocalizedArticle().setValue(fieldName,value);
 	}
-	
+
 	/*
-	 * If this is set this should return the base folder for storing articles.<br/> 
+	 * If this is set this should return the base folder for storing articles.<br/>
 	 * By default it is '/files/cms/article'
 	 */
 	public String getBaseFolderLocation() {
@@ -723,36 +557,37 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 			return ArticleUtil.getArticleBaseFolderPath();
 		}
 	}
+
 	/*
-	 * This sets the base folder for storing articles, 
+	 * This sets the base folder for storing articles,
 	 * something like '/files/cms/article'
 	 */
 	public void setBaseFolderLocation(String path) {
 		this.baseFolderLocation = path;
 	}
-	
+
 	@Override
 	public Locale getLocale(){
 		return super.getLocale();
 	}
-	
+
 	@Override
 	public void setLocale(Locale locale){
 		super.setLocale(locale);
 	}
-	
+
 	@Override
 	public void setResourcePath(String resourcePath){
 		this.resourcePath=resourcePath;
 		updateLocalizedArticleBean();
 	}
-	
+
 	protected void updateLocalizedArticleBean(){
 		String resourcePath = getResourcePath();
 		String localizedResourcePath = calculateLocalizedResourcePath(resourcePath);
 		getLocalizedArticle().setResourcePath(localizedResourcePath);
 	}
-	
+
 	/**
 	 * <p>
 	 * Creates the resourcePath for the localized file (.../myarticle.article/en.xml)
@@ -767,7 +602,7 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 		resourcePath += getArticleDefaultLocalizedFileName(language);
 		return resourcePath;
 	}
-	
+
 	private String calculateLocalizedResourcePath(String resourcePath) {
 		return calculateLocalizedResourcePath(resourcePath,getLanguage());
 	}
@@ -775,11 +610,11 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 	private String getArticleDefaultLocalizedFileName(String language){
 		return language+ARTICLE_FILE_SUFFIX;
 	}
-	
+
 	private String getArticleDefaultLocalizedResourcePath(){
 		return getArticleDefaultLocalizedResourcePath(getLanguage());
 	}
-	
+
 	private String getArticleDefaultLocalizedResourcePath(String language){
 		String resourcePath = getResourcePath();
 		return calculateLocalizedResourcePath(resourcePath);
@@ -789,7 +624,7 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 	 * This method returns the path of the article without the language part:
 	 * ../cms/article/YYYY/MM/YYYYMMDD-HHmm.article while ContentItem#getResourcePath()
 	 * returns the path to the actual resource ../cms/article/YYYY/MM/YYYYMMDD-HHmm.article/lang.xml
-	 * 
+	 *
 	 * @see ContentItem#getResourcePath()
 	 * @return Partial path of the article without the language part.
 	 */
@@ -802,8 +637,7 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 		}
 		return sResourcePath;
 	}
-	
-	
+
 	public synchronized String createArticlePath() {
 		String resourcePath = getGeneratedArticleResourcePath();
 		int index = resourcePath.indexOf("."+CoreConstants.ARTICLE_FILENAME_SCOPE);
@@ -813,28 +647,28 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 			return articlePath;
 		}
 		Logger log = Logger.getLogger(this.getClass().toString());
-		log.warning("Resource path for article '"+resourcePath+"' does not contain article filename scope '."+CoreConstants.ARTICLE_FILENAME_SCOPE+"'.  The resource path is returned unchanged.");
+		log.warning("Resource path for article '"+resourcePath+"' does not contain article filename scope '."+CoreConstants.ARTICLE_FILENAME_SCOPE+
+				"'.  The resource path is returned unchanged.");
 		return resourcePath;
 	}
-	
+
 	/**
 	 * Returns the path to the actual resource (xml-file) ../cms/article/YYYY/MM/YYYYMMDD-HHmm.article/lang.xml
-	 * 
+	 *
 	 * @see ContentItem#getResourcePath()
 	 * @return
 	 */
 	private String getGeneratedArticleResourcePath() {
-		makesureStandardFolderisCreated();
 		String path = null;
 		try {
-			path =  generateArticleResourcePath(CoreUtil.getIWContext());
+			path = generateArticleResourcePath(CoreUtil.getIWContext());
 		}
 		catch (UnavailableIWContext e) {
 			e.printStackTrace();
 		}
 		return path;
 	}
-	
+
 	/**
 	 * Constructs the path for the article file as follows
 	 * First it gets the folder location of the article, this is typically generated by
@@ -852,24 +686,24 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 			e.printStackTrace();
 			return null;
 		}
-		
+
 		return service.generateResourcePath(getBaseFolderLocation(), CoreConstants.ARTICLE_FILENAME_SCOPE, CoreConstants.ARTICLE_FILENAME_SCOPE);
 	}
-	
+
 	/* (non-Javadoc)
 	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#setLanguageChange(java.lang.String)
 	 */
 	public void setLanguageChange(String s) {
 		this.languageChange=s;
 	}
-	
+
 	/* (non-Javadoc)
 	 * @see com.idega.block.article.bean.ArticleLocalizedItemBean#getLanguageChange()
 	 */
 	public String getLanguageChange() {
 		return this.languageChange;
 	}
-	
+
 	/**
 	 * <p>
 	 * Makes sure the standard folder /cms/articles is created and that it has correct permissions.
@@ -880,43 +714,43 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 		IWSlideService slideService = getIWSlideService(iwuc);
 		String contentFolderPath = ArticleUtil.getContentRootPath();
 		String articlePath = ArticleUtil.getArticleBaseFolderPath();
-		
-		
+
+
 		try {
 			//first make the folder:
 			slideService.createAllFoldersInPathAsRoot(articlePath);
-			
+
 			//was not used? slideService.getWebdavResourceAuthenticatedAsRoot(contentFolderPath);
 			AccessControlList aclList = slideService.getAccessControlList(contentFolderPath);
 			AuthenticationBusiness authBusiness = ((IWSlideServiceBean)slideService).getAuthenticationBusiness();
-			
+
 			String editorRoleUri = authBusiness.getRoleURI(StandardRoles.ROLE_KEY_EDITOR);
 			Ace editorAce = new Ace(editorRoleUri);
 			editorAce.addPrivilege(Privilege.READ);
 			editorAce.addPrivilege(Privilege.WRITE);
 			AccessControlEntry editorEntry = new AccessControlEntry(editorAce,AccessControlEntry.PRINCIPAL_TYPE_ROLE);
 			aclList.add(editorEntry);
-			
+
 			String authorRoleUri = authBusiness.getRoleURI(StandardRoles.ROLE_KEY_AUTHOR);
 			Ace authorAce = new Ace(authorRoleUri);
 			authorAce.addPrivilege(Privilege.READ);
 			authorAce.addPrivilege(Privilege.WRITE);
 			AccessControlEntry authorEntry = new AccessControlEntry(authorAce,AccessControlEntry.PRINCIPAL_TYPE_ROLE);
 			aclList.add(authorEntry);
-			
-			
+
+
 			slideService.storeAccessControlList(aclList);
-			
+
 			//debug:
 			aclList = slideService.getAccessControlList(contentFolderPath);
-			
+
 		}
 		catch (Exception e) {
 			e.printStackTrace();
 		}*/
-		
+
 	}
-	
+
 	/**
 	 * Loads the article (folder)
 	 */
@@ -924,7 +758,7 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 	protected boolean load(String path) throws IOException {
 		return super.load(path);
 	}
-	
+
 	private void setLanguageFromFilePath(String filePath){
 		String fileEnding = ARTICLE_FILE_SUFFIX;
 		if(filePath.endsWith(fileEnding)){
@@ -937,77 +771,71 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 			throw new RuntimeException("filePath: "+filePath+" does not contain expected file ending: "+fileEnding);
 		}
 	}
-	
+
+//	/**
+//	 * Loads the article (folder)
+//	 */
+//	protected boolean load(RepositoryItem repositoryItem) throws IOException {
+//		RepositoryItem localizedArticleFile = null;
+//		//First check if the resource is a folder, as it should be
+//		if (repositoryItem.isCollection()) {
+//			Collection<RepositoryItem> resources = repositoryItem.getChildResources();
+//			String userLanguageArticleResourcePath = getArticleDefaultLocalizedResourcePath();
+//			if(resources.isThereResourceName(userLanguageArticleResourcePath)){ //the language that the user has selected
+//				localizedArticleFile = (WebdavExtendedResource) resources.getResource(userLanguageArticleResourcePath);
+//				setAvailableInSelectedLanguage();
+//			}
+//			else{
+//				//selected language not available:
+//				if(getAllowFallbackToSystemLanguage()){
+//					String systemLanguageArticleResourcePath = getArticleDefaultLocalizedResourcePath(getSystemLanguage());//getArticleName(iwc.getIWMainApplication().getDefaultLocale());
+//					if(resources.isThereResourceName(systemLanguageArticleResourcePath)){ //the language default in the system.
+//						localizedArticleFile = (WebdavExtendedResource) resources.getResource(systemLanguageArticleResourcePath);
+//						setAvailableInSelectedLanguage();
+//					}
+//					else{
+//						setNotAvailableInSelectedLanguage();
+//					}
+//				}
+//				else{
+//					setNotAvailableInSelectedLanguage();
+//				}
+//
+//			}
+//		} else {
+//			String path = getResourcePath();
+//			setLanguageFromFilePath(path);
+//			String parentFolder = webdavResource.getParentPath();
+//			setResourcePath(parentFolder);
+//			return load(parentFolder);
+//		}
+//		if(localizedArticleFile!=null){
+//			return getLocalizedArticle().load(localizedArticleFile);
+//		}
+//		return false;
+//	}
+
 	/**
 	 * Loads the article (folder)
-	 */
-	@Override
-	protected boolean load(WebdavExtendedResource webdavResource) throws IOException {
-		WebdavExtendedResource localizedArticleFile = null;
-		//First check if the resource is a folder, as it should be
-		if(webdavResource.isCollection()){
-			
-			WebdavResources resources = webdavResource.getChildResources();
-			String userLanguageArticleResourcePath = getArticleDefaultLocalizedResourcePath();
-			if(resources.isThereResourceName(userLanguageArticleResourcePath)){ //the language that the user has selected
-				localizedArticleFile = (WebdavExtendedResource) resources.getResource(userLanguageArticleResourcePath);
-				setAvailableInSelectedLanguage();
-			}
-			else{
-				//selected language not available:
-				if(getAllowFallbackToSystemLanguage()){
-					String systemLanguageArticleResourcePath = getArticleDefaultLocalizedResourcePath(getSystemLanguage());//getArticleName(iwc.getIWMainApplication().getDefaultLocale());
-					if(resources.isThereResourceName(systemLanguageArticleResourcePath)){ //the language default in the system.
-						localizedArticleFile = (WebdavExtendedResource) resources.getResource(systemLanguageArticleResourcePath);
-						setAvailableInSelectedLanguage();
-					}
-					else{
-						setNotAvailableInSelectedLanguage();
-					}
-				}
-				else{
-					setNotAvailableInSelectedLanguage();
-				}
-				
-			}
-		} else {
-			String path = getResourcePath();
-			setLanguageFromFilePath(path);
-			String parentFolder = webdavResource.getParentPath();
-			setResourcePath(parentFolder);
-			return load(parentFolder);
-		}
-		if(localizedArticleFile!=null){
-			return getLocalizedArticle().load(localizedArticleFile);
-		}
-		return false;
-	}
-	
-	
-	/**
-	 * Loads the article (folder)
-	 * @throws RepositoryException 
+	 * @throws RepositoryException
 	 */
 	@Override
 	protected boolean load(Node articleNode) throws IOException, RepositoryException {
 		Node localizedArticleFile = null;
 		//First check if the resource is a folder, as it should be
-		if(articleNode.getPrimaryNodeType().isNodeType(RepositoryHelper.NODE_TYPE_FOLDER)){
-			
+		if (articleNode.getPrimaryNodeType().isNodeType(getRepositoryService().getRepositoryConstantFolderType())) {
 			NodeIterator resources = articleNode.getNodes();
 			String userLanguageArticleResourcePath = getArticleDefaultLocalizedResourcePath();
 			if(containsChildResourceWithPath(resources,userLanguageArticleResourcePath)){ //the language that the user has selected
-				//localizedArticleFile = (WebdavExtendedResource) resources.getResource(userLanguageArticleResourcePath);
-				localizedArticleFile = articleNode.getSession().getRootNode().getNode(userLanguageArticleResourcePath);
+				localizedArticleFile = getRepositoryService().getNode(userLanguageArticleResourcePath);//articleNode.getSession().getRootNode().getNode(userLanguageArticleResourcePath);
 				setAvailableInSelectedLanguage();
 			}
 			else{
 				//selected language not available:
 				if(getAllowFallbackToSystemLanguage()){
-					String systemLanguageArticleResourcePath = getArticleDefaultLocalizedResourcePath(getSystemLanguage());//getArticleName(iwc.getIWMainApplication().getDefaultLocale());
+					String systemLanguageArticleResourcePath = getArticleDefaultLocalizedResourcePath(getSystemLanguage());
 					if(containsChildResourceWithPath(resources,systemLanguageArticleResourcePath)){ //the language default in the system.
-						//localizedArticleFile = (WebdavExtendedResource) resources.getResource(systemLanguageArticleResourcePath);
-						localizedArticleFile = articleNode.getSession().getRootNode().getNode(systemLanguageArticleResourcePath);
+						localizedArticleFile = getRepositoryService().getNode(systemLanguageArticleResourcePath);//articleNode.getSession().getRootNode().getNode(systemLanguageArticleResourcePath);
 						setAvailableInSelectedLanguage();
 					}
 					else{
@@ -1017,7 +845,7 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 				else{
 					setNotAvailableInSelectedLanguage();
 				}
-				
+
 			}
 		} else {
 			String path = getResourcePath();
@@ -1025,6 +853,7 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 			String parentFolder;
 			parentFolder = articleNode.getParent().getPath();
 			setResourcePath(parentFolder);
+
 			return load(parentFolder);
 		}
 		if(localizedArticleFile!=null){
@@ -1033,17 +862,14 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 		return false;
 	}
 
-	
-	protected boolean containsChildResourceWithPath(NodeIterator resources,
-			String childFullPath) {
-		while(resources.hasNext()){
+	protected boolean containsChildResourceWithPath(NodeIterator resources,	String childFullPath) {
+		while (resources.hasNext()) {
 			Node child = resources.nextNode();
 			try {
 				if(child.getPath().equals(childFullPath)){
 					return true;
 				}
 			} catch (RepositoryException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
@@ -1063,7 +889,7 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 		}
 		return null;
 	}
-	
+
 	public Locale getSystemLocale(){
 		FacesContext context = FacesContext.getCurrentInstance();
 		if(context!=null){
@@ -1071,19 +897,19 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 		}
 		return null;
 	}
-	
+
 	public boolean getAllowFallbackToSystemLanguage(){
 		return this.allowFallbackToSystemLanguage;
 	}
-	
+
 	public void setAllowFallbackToSystemLanguage(boolean allow){
 		this.allowFallbackToSystemLanguage=allow;
 	}
-	
+
 	public void setAvailableInSelectedLanguage(){
 		this.availableInRequestedLanguage=true;
 	}
-	
+
 	public void setNotAvailableInSelectedLanguage(){
 		this.availableInRequestedLanguage = false;
 		if (!getAllowFallbackToSystemLanguage()) {
@@ -1097,32 +923,30 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 	}
 
 	/**
+	 * <p>
+	 * Returns true if this article is available for the language of the
+	 * locale set on this article item.
+	 * </p>
 	 * @return true if this article is available for the language of the locale set on this article item.
 	 */
 	public boolean getAvailableInRequestedLanguage() {
 		return this.availableInRequestedLanguage;
 	}
 
-	/* (non-Javadoc)
-	 * @see com.idega.content.bean.ContentItemBean#delete()
-	 */
 	@Override
 	public void delete() {
 		getLocalizedArticle().delete();
 		this.localizedArticle=null;
 		super.delete();
-		
+
 		ArticleCacher cacher = ArticleCacher.getInstance(IWMainApplication.getDefaultIWMainApplication());
 		cacher.getCacheMap().clear();
-		
+
 		ContentUtil.removeCategoriesViewersFromCache();
 	}
 
-	/* (non-Javadoc)
-	 * @see javax.faces.event.ValueChangeListener#processValueChange(javax.faces.event.ValueChangeEvent)
-	 */
+	@Override
 	public void processValueChange(ValueChangeEvent event) throws AbortProcessingException {
-		
 	}
 
 	@Override
@@ -1134,15 +958,15 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 	public void setPublishedDate(Timestamp date) {
 		getLocalizedArticle().setPublishedDate(date);
 	}
-	
+
 	/**
 	 * Add or change categories of article here. Do not use UPPER case letters, use "-" instead of spaces. There should not be any simple spaces.
-	 * @param articleCategories Selected categories. Example: ",first-category,category,last-category," 
+	 * @param articleCategories Selected categories. Example: ",first-category,category,last-category,"
 	 */
 	public void setArticleCategories(String articleCategories) {
 		getLocalizedArticle().setArticleCategories(articleCategories);
 	}
-	
+
 	@Override
 	public boolean isSetPublishedDateByDefault() {
 		return super.isSetPublishedDateByDefault();
@@ -1154,7 +978,7 @@ public class ArticleItemBean extends ContentItemBean implements Serializable, Co
 	}
 
 	/**
-	 * 
+	 *
 	 * @return Categories of an article
 	 */
 	public List<String> getCategories() {
